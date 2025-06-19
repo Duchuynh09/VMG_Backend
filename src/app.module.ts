@@ -12,14 +12,14 @@ import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
-    /*
+
     // Thay đổi 'garment_price_db' thành 'VMG'
     MongooseModule.forRoot('mongodb://localhost:27017/VMG', {
       // Các tùy chọn Mongoose (có thể bỏ qua nếu dùng phiên bản mới)
       // useNewUrlParser: true,
       // useUnifiedTopology: true,
     }),
-    */
+
     ConfigModule.forRoot({
       envFilePath: '.env',
       isGlobal: true,
@@ -33,4 +33,4 @@ import { ConfigModule } from '@nestjs/config';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
