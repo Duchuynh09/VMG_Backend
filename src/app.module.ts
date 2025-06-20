@@ -12,13 +12,15 @@ import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
-
+    ConfigModule.forRoot(),
     // Thay đổi 'garment_price_db' thành 'VMG'
-    MongooseModule.forRoot('mongodb://localhost:27017/VMG', {
-      // Các tùy chọn Mongoose (có thể bỏ qua nếu dùng phiên bản mới)
-      // useNewUrlParser: true,
-      // useUnifiedTopology: true,
-    }),
+    MongooseModule.forRoot(
+      process.env.CONNECT_STRING || 'mongodb://127.0.0.1:27017/VMG'
+      , {
+        // Các tùy chọn Mongoose (có thể bỏ qua nếu dùng phiên bản mới)
+        // useNewUrlParser: true,
+        // useUnifiedTopology: true,
+      }),
 
     ConfigModule.forRoot({
       envFilePath: '.env',
