@@ -15,7 +15,7 @@ export class UsersService {
   ) { }
 
   async getAll() {
-    return this.userModel.find()
+    return this.userModel.find().exec()
   }
   // Khởi tạo một user mới
   async createEmployee(data: {

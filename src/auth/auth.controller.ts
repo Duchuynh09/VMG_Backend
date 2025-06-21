@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Request, Response, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -6,6 +6,7 @@ import { Roles } from './roles/roles.decorator';
 import { Role } from 'src/enums/role.enum';
 import { RolesGuard } from './roles/roles.guard';
 import { UsersService } from 'src/users/users.service';
+import { access } from 'fs';
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -14,14 +15,27 @@ export class AuthController {
   ) { }
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  async login(@Request() req) {
-    return this.authService.login(req.user);
+  async login(@Request() req, @Response({ passthrough: true }) res) {
+    const token = await this.authService.login(req.user);
+    res.cookie('access_token', token.access_token, {
+      httpOnly: true,     // 🔒 Không cho JS truy cập
+      secure: false,      // Bật true nếu dùng HTTPS
+      sameSite: 'lax',    // hoặc 'strict', 'none'
+      maxAge: 1000 * 60 * 60 * 24, // 1 ngày
+    });
+    return { mess: "Login thanh cong", access_token: token.access_token }
   }
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(Role.Admin, Role.HR)
   @Post('register')
   async register(@Body() body) {
     return this.authService.register(body);
+  }
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin, Role.HR)
+  @Delete(':id')
+  async delete(@Param() param: any) {
+    return this.usersService.deleteEmployee(param.id)
   }
   @Post('logout')
   async logout(@Request() req) {
@@ -32,4 +46,5 @@ export class AuthController {
   async refresh() {
     // return this.authService.refresh();
   }
+
 }

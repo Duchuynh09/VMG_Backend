@@ -3,8 +3,6 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ProductTypeModule } from './product-type/product-type.module';
-import { ProcessDetailModule } from './process-detail/process-detail.module';
 // import { ProductConfigurationModule } from './product-configuration/product-configuration.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
