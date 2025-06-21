@@ -4,7 +4,10 @@ import { Document } from 'mongoose';
 import { Role } from 'src/enums/role.enum';
 
 @Schema({ timestamps: true })
-export class User extends Document {
+export class WorkerProfile extends Document {
+  @Prop({ required: true })
+
+
   @Prop({ required: true })
   username: string;
 
@@ -13,6 +16,9 @@ export class User extends Document {
 
   @Prop({ required: true })
   password: string;
+
+  @Prop({ required: true })
+  cccd: string
 
   @Prop({ required: true, enum: [Role.Admin, Role.Employee, Role.HR, Role.Manager] })
   role: string;
@@ -38,8 +44,8 @@ export class User extends Document {
   workingHours: { date: string; startTime: string; endTime: string }[];
 }
 
-export const UserSchema = SchemaFactory.createForClass(User);
-UserSchema.index({ username: 1 });
-UserSchema.index({ teamId: 1 });
-UserSchema.index({ 'productivity.date': 1 });
-UserSchema.index({ 'workingHours.date': 1 });
+export const WorkerProfileShema = SchemaFactory.createForClass(WorkerProfile);
+WorkerProfileShema.index({ username: 1 });
+WorkerProfileShema.index({ teamId: 1 });
+WorkerProfileShema.index({ 'productivity.date': 1 });
+WorkerProfileShema.index({ 'workingHours.date': 1 });

@@ -1,11 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Post, Request, Response, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Request, Response, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { Roles } from './roles/roles.decorator';
 import { Role } from 'src/enums/role.enum';
 import { RolesGuard } from './roles/roles.guard';
-import { UsersService } from 'src/users/users.service';
+import { UsersService } from 'src/worker/woker.service';
 import { access } from 'fs';
 @Controller('auth')
 export class AuthController {
@@ -30,12 +30,6 @@ export class AuthController {
   @Post('register')
   async register(@Body() body) {
     return this.authService.register(body);
-  }
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.HR)
-  @Delete(':id')
-  async delete(@Param() param: any) {
-    return this.usersService.deleteEmployee(param.id)
   }
   @Post('logout')
   async logout(@Request() req) {
