@@ -1,18 +1,20 @@
 
 import { Injectable } from '@nestjs/common';
-import { UsersService } from '../worker/woker.service';
+import { User } from "./schemas/user.schema";
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private usersService: UsersService,
+    @InjectModel(User.name) private authModel: Model<User>,
     private jwtService: JwtService
   ) { }
   //Kiểm tra tài khoản và mật khẩu
   async validateUser(username: string, pass: string): Promise<any> {
-    const user = await this.usersService.findByUsername(username);
+    const user = await this.authModel.findOne({username});
     if (user) {
       const compliPass = await bcrypt.compare(pass, user.password)
       if (compliPass) {
@@ -30,6 +32,11 @@ export class AuthService {
     };
   }
   async register(payload: any) {
-    return this.usersService.createEmployee(payload)
+    return "Tạo tài khoản và thông tin cho công nhân"
+    // return this.usersService.createEmployee(payload)
+  }
+  async getAll(){
+    const users = await this.authModel.find().exec()
+    return users
   }
 }

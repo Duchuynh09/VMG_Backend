@@ -40,5 +40,8 @@ export class AuthController {
   async refresh() {
     // return this.authService.refresh();
   }
-
+  @Get('/')
+  async get() {
+    return this.authService.getAll();
+  }
 }

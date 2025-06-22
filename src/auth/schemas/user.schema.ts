@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { Document, Types } from "mongoose";
 import { WorkerProfile } from "src/worker/schemas/worker.schema";
 
-@Schema()
+@Schema({ timestamps: true })
 export class User extends Document {
     @Prop({ required: true, unique: true })
     username: string;
