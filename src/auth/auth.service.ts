@@ -14,21 +14,7 @@ export class AuthService {
     @InjectModel(User.name) private authModel: Model<User>,
     private jwtService: JwtService
   ) { }
-  //Kiểm tra tài khoản và mật khẩu
-  async validateUser(username: string, pass: string): Promise<any> {
-    const user = await this.authModel.findOne({ username });
-    if (user) {
-      const compliPass = await bcrypt.compare(pass, user.password)
-      if (compliPass) {
-        const { password: _, ...safeUser } = user.toObject(); // Remove hashed password
-        return safeUser;
-      }
-    }
-    return null;
-  }
-  async login(user: User, userAgent: string, ip: string) {
-    // @UseGuards sẽ kiểm tra trước khi chạy login
-    // user.profile = id của thông tin người dùng
+  async #createToken(user:User){
     const payload = { temmId: user.profile, sub: user._id, roles: [user.role] };
 
     const accessToken = this.jwtService.sign(payload, {
@@ -42,20 +28,38 @@ export class AuthService {
     });
     const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
 
-    // ✏️ Lưu vào danh sách refreshTokens
-    await this.authModel.findByIdAndUpdate(user._id, {
-      $push: {
-        refreshTokens: {
-          tokenHash: hashedRefreshToken,
-          userAgent,
-          ip,
-        },
-      },
-    });
     return {
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    };
+      accessToken,hashedRefreshToken,refreshToken
+    }
+  }
+  //Kiểm tra tài khoản và mật khẩu
+  async validateUser(username: string, pass: string): Promise<any> {
+    const user = await this.authModel.findOne({ username });
+    if (user) {
+      const compliPass = await bcrypt.compare(pass, user.password)
+      if (compliPass) {
+        return user;
+      }
+    }
+    return null;
+  }
+  async login(user: User, userAgent: string, ip: string) {
+    // @UseGuards sẽ kiểm tra trước khi chạy login
+    // user.profile = id của thông tin người dùng
+    const tokens = await this.#createToken(user)
+        // ✅ Loại bỏ token cũ từ cùng thiết bị
+    const cleanedTokens = user.refreshTokens.filter(
+      (entry) => entry.userAgent !== userAgent || entry.ip !== ip,
+    );
+    cleanedTokens.push({
+      tokenHash: tokens.hashedRefreshToken,
+      userAgent,
+      ip,
+    });
+    // 🧠 Ghi lại toàn bộ mảng
+    user.refreshTokens = cleanedTokens;
+    await user.save();
+    return tokens
   }
   async refreshToken(rawToken: string, userAgent: string, ip: string) {
     // token là refresh-token lấy từ cookie 
@@ -77,24 +81,14 @@ export class AuthService {
       if (matchedIndex === undefined || matchedIndex === -1) {
         throw new UnauthorizedException('Token không hợp lệ');
       }
-
-      const newAccessToken = this.jwtService.sign(
-        { username: payload.username, sub: payload.sub },
-        {
-          secret: jwtConstants.accessSecret,
-          expiresIn: '1h',
-        },
-      );
-      const newRefreshToken = this.jwtService.sign(
-        { username: user.username, sub: user._id },
-        { secret: jwtConstants.refreshSecret, expiresIn: '7d' },
-      );
+      const tokens = await this.#createToken(user)
+      const newAccessToken = tokens.accessToken
+      const newRefreshToken = tokens.refreshToken
       // 🔒 Hash và lưu token mới
-      const hashedRefreshToken = await bcrypt.hash(newRefreshToken, 10);
       // xoá cái cũ ngay vị trí tìm được token khớp trong db ở trên
       user.refreshTokens.splice(matchedIndex, 1);
       user.refreshTokens.push({
-        tokenHash: hashedRefreshToken, userAgent, ip
+        tokenHash: tokens.hashedRefreshToken, userAgent, ip
       })
       await user.save();
       return {

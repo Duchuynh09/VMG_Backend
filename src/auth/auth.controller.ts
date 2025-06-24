@@ -17,12 +17,12 @@ export class AuthController {
     const userAgent = req.headers['user-agent'];
     const ip = req.ip || req.connection.remoteAddress;
     const tokens = await this.authService.login(req.user, userAgent, ip);
-    res.cookie('access_token', tokens.access_token, {
+    res.cookie('access_token', tokens.accessToken, {
       httpOnly: true,
       maxAge: 1000 * 60 * 60, // 1 tiếng
     });
 
-    res.cookie('refresh_token', tokens.refresh_token, {
+    res.cookie('refresh_token', tokens.refreshToken, {
       httpOnly: true,
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 ngày
     });
