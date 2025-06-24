@@ -12,11 +12,11 @@ async function bootstrap() {
     origin: 'http://localhost:3000', // or your frontend domain
     credentials: true,              // allow cookies
   });
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3001);
   if (module.hot) {
     module.hot.accept();
     module.hot.dispose(() => app.close())
   }
-  console.log(`Server is running on port ${process.env.PORT ?? 3000}`);
+  console.log(`Server is running on port ${process.env.PORT ?? 3001}`);
 }
 bootstrap();
