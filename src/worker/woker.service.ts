@@ -1,21 +1,28 @@
-
-import { BadRequestException, Injectable } from '@nestjs/common';
+// src/worker/worker.service.ts
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
+
+import * as dayjs from 'dayjs';
 // This should be a real class/interface representing a user entity
 import { WorkerProfile } from './schemas/worker.schema';
-import { Operation } from 'src/operations/schemas/operation.shema';
+import { Operation } from 'src/worker/schemas/operation.shema';
+import { User } from 'src/auth/schemas/user.schema';
+import { UpdateProductivityDto } from './dto/worker.dto';
+
 @Injectable()
-export class UsersService {
+export class WorkerService {
   // Sử dụng mongoose để lấy user từ database
   // @InjectModel('user') private userModel: Model<User>;
-  constructor(@InjectModel(WorkerProfile.name) private workModel: Model<WorkerProfile>,
+  constructor(
+    @InjectModel(WorkerProfile.name) private workerModel: Model<WorkerProfile>,
     @InjectModel(Operation.name) private operationModel: Model<Operation>,
+    @InjectModel(User.name) private userModel: Model<User>
   ) { }
 
   async getAll() {
-    return this.workModel.find().exec()
+    return this.workerModel.find().exec()
   }
   // Khởi tạo một user mới
   async createEmployee(data: {
@@ -25,13 +32,13 @@ export class UsersService {
     teamId?: string;
     role?: string;
   }): Promise<WorkerProfile> {
-    const existingUser = await this.workModel.findOne({ username: data.username }).exec();
+    const existingUser = await this.workerModel.findOne({ username: data.username }).exec();
     if (existingUser) {
       throw new BadRequestException('Username already exists');
     }
     // Băm password trước khi lưu vào database
     const hashedPassword = await bcrypt.hash(data.password, 10);
-    const user = new this.workModel({
+    const user = new this.workerModel({
       ...data,
       password: hashedPassword,
       role: data.role || 'employee',
@@ -42,11 +49,11 @@ export class UsersService {
   }
   // Tìm theo tên 
   async findByUsername(username: string): Promise<WorkerProfile | null> {
-    return this.workModel.findOne({ username }).exec();
+    return this.workerModel.findOne({ username }).exec();
   }
   // Tìm theo id 
   async findByUserid(id: string): Promise<WorkerProfile | null> {
-    return this.workModel.findById(id).exec();
+    return this.workerModel.findById(id).exec();
   }
   // Cập nhật user
   async updateEmployee(id: string, data: {
@@ -55,108 +62,141 @@ export class UsersService {
     email?: string;
     teamId?: string;
   }): Promise<WorkerProfile> {
-    const user = await this.workModel.findById(id).exec();
+    const user = await this.workerModel.findById(id).exec();
     if (!user) {
       throw new BadRequestException('User not found');
     }
-    if (user.role !== 'employee') {
-      throw new BadRequestException('Can only update employees');
-    }
-    const updatedUser = await this.workModel.findByIdAndUpdate(id, { $set: data }, { new: true }).exec();
+    const updatedUser = await this.workerModel.findByIdAndUpdate(id, { $set: data }, { new: true }).exec();
     if (!updatedUser) {
       throw new BadRequestException('User not found after update');
     }
     return updatedUser;
   }
   // Xóa user
+
   async deleteEmployee(id: string): Promise<void> {
-    const user = await this.workModel.findById(id).exec();
-    if (!user) {
-      throw new BadRequestException('User not found');
-    }
-    if (user.role !== 'employee') {
-      throw new BadRequestException('Can only delete employees');
-    }
-    await this.workModel.findByIdAndDelete(id).exec();
+    const user = await this.userModel.findById(id);
+    if (!user) throw new NotFoundException('User not found');
+
+    await this.workerModel.deleteOne({ user: id });
+    await this.userModel.deleteOne({ _id: id });
   }
 
+  async updateProfileByUser(data: {
+    fullName: string,
+    birthDay?: Date,
+    cccd?: string,
+    phone?: string,
+    address?: string
+    user: string
+  }) {
+    const user = this.workerModel.findOneAndUpdate(
+      data
+      ,
+      {},
+      {
+        returnDocument: "after", upsert: true
+      }
+    )
+    return user
+  }
+  // CHƯA ĐỌC LẠI
+  // Chỉnh sửa nhật ký sản lượng 
+  async updateProductivity(
+    workerId: string,
+    dto: UpdateProductivityDto,
+  ): Promise<{ message: string }> {
+    const worker = await this.workerModel.findById(workerId);
+    if (!worker) {
+      throw new NotFoundException('Không tìm thấy công nhân');
+    }
 
-  /*
-  
-    // Cập nhật sản lượng 
-    async updateProductivity(userId: string, date: string, amount: number): Promise<WorkerProfile> {
-      const updatedUser = await this.workModel
-        .findByIdAndUpdate(
-          userId,
-          { $set: { [`productivity.${date}`]: amount } },
-          { new: true },
-        )
-        .exec();
-      if (!updatedUser) {
-        throw new BadRequestException('User not found');
+    const existingIndex = worker.productivity.findIndex(
+      (entry) =>
+        entry.date === dto.date &&
+        entry.productCode === dto.productCode &&
+        entry.operationId === dto.operationId,
+    );
+
+    if (existingIndex >= 0) {
+      // Cập nhật sản lượng
+      worker.productivity[existingIndex].amount = dto.amount;
+      if (dto.isPrimary !== undefined) {
+        worker.productivity[existingIndex].isPrimary = dto.isPrimary;
       }
-      return updatedUser;
+    } else {
+      // Thêm mới nếu chưa có
+      worker.productivity.push({
+        date: dto.date,
+        productCode: dto.productCode,
+        operationId: dto.operationId,
+        amount: dto.amount,
+        isPrimary: dto.isPrimary ?? true,
+      });
     }
-    async updateWorkingHours(
-      userId: string,
-      date: string,
-      startTime: string,
-      endTime: string,
-    ): Promise<WorkerProfile> {
-      const user = await this.userModel.findById(userId).exec();
-      if (!user) {
-        throw new BadRequestException('User not found');
-      }
-      const workingHours = user.workingHours.filter((wh) => wh.date !== date);
-      workingHours.push({ date, startTime, endTime });
-      const updatedUser = await this.userModel
-        .findByIdAndUpdate(userId, { $set: { workingHours } }, { new: true })
-        .exec();
-      if (!updatedUser) {
-        throw new BadRequestException('User not found');
-      }
-      return updatedUser;
+
+    await worker.save();
+    return { message: 'Cập nhật sản lượng thành công' };
+  }
+  // Chưa đọc
+  async getMonthlySalary(workerId: string, month: string) {
+    const worker = await this.workerModel.findById(workerId).lean();
+    if (!worker) throw new NotFoundException('Worker not found');
+
+    const monthStart = dayjs(`${month}-01`);
+    const monthEnd = monthStart.endOf('month');
+
+    const operations = await this.operationModel.find().lean();
+
+    const logs = worker.productivity.filter((log) => {
+      const date = dayjs(log.date);
+      return date.isAfter(monthStart.subtract(1, 'day')) && date.isBefore(monthEnd.add(1, 'day'));
+    });
+
+    let total = 0;
+    const detail: Array<{
+      date: string;
+      productCode: string;
+      operationName: string;
+      unitPrice: number;
+      amount: number;
+      total: number;
+      support: boolean;
+    }> = [];
+
+    for (const log of logs) {
+      const operation = operations.find(
+        (op) =>
+          op._id.toString() === log.operationId &&
+          op.productCode === log.productCode,
+      );
+
+      if (!operation) continue;
+
+      const isSupport =
+        log.isPrimary === false ||
+        operation.team !== worker.teamId;
+
+      const unitPrice = operation.unitPrice * (isSupport ? 1.2 : 1);
+
+      const amount = log.amount * unitPrice;
+      total += amount;
+
+      detail.push({
+        date: log.date,
+        productCode: log.productCode,
+        operationName: operation.name,
+        unitPrice,
+        amount: log.amount,
+        total: amount,
+        support: isSupport,
+      });
     }
-    // ====Cập nhật sản lượng và thời gian làm việc hàng loạt===
-    // Cập nhật sản lượng
-    async bulkUpdateProductivity(updates: { userId: string; date: string; amount: number }[]) {
-      const bulkOps = updates.map(({ userId, date, amount }) => ({
-        updateOne: {
-          filter: { _id: userId, role: 'employee' },
-          update: { $set: { [`productivity.${date}`]: amount } },
-        },
-      }));
-      return this.userModel.bulkWrite(bulkOps);
-    }
-    // Cập nhật thời gian làm việc
-    async bulkUpdateWorkingHours(updates: { userId: string; date: string; startTime: string; endTime: string }[]) {
-      const bulkOps = updates.map(({ userId, date, startTime, endTime }) => ({
-        updateOne: {
-          filter: { _id: userId, role: 'employee' },
-          update: {
-            $push: {
-              workingHours: { $each: [{ date, startTime, endTime }], $slice: -30 }, // giữ tối đa 30 ngày
-            },
-          },
-        },
-      }));
-      return this.userModel.bulkWrite(bulkOps);
-    }
-  
-    async getProductivity(userId: string): Promise<any> {
-      const user = await this.userModel.findById(userId).exec();
-  
-      return user ? user.productivity : {};
-    }
-  
-    // Lấy sản lượng của team
-    async getTeamProductivity(teamId: string): Promise<any> {
-      const users = await this.userModel.find({ teamId, role: 'employee' }).exec();
-      return users.map((user) => ({
-        username: user.username,
-        productivity: user.productivity,
-        workingHours: user.workingHours,
-      }));
-    }
-      */
+
+    return {
+      workerName: worker.fullName,
+      totalSalary: total,
+      details: detail,
+    };
+  }
 }

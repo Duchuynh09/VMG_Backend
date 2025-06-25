@@ -1,51 +1,43 @@
-// src/users/user.schema.ts
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
-import { Role } from 'src/enums/role.enum';
+// src/worker/schemas/worker-profile.schema.ts
+import {
+  Prop,
+  Schema,
+  SchemaFactory,
+} from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
+import { OperationLog, OperationLogSchema } from './operationLog.shema';
+import { WorkingHour, WorkingHourSchema } from './workingHour.shema';
 
 @Schema({ timestamps: true })
 export class WorkerProfile extends Document {
-  @Prop({ required: true })
+  @Prop({ required: true }) fullName: string;
+  @Prop({ required: true }) cccd: string;
+  @Prop() birthDate?: Date;
+  @Prop() phone?: string;
+  @Prop() address?: string;
 
-
-  @Prop({ required: true })
-  username: string;
-
-  @Prop({ required: true })
-  email: string;
-
-  @Prop({ required: true })
-  password: string;
-
-  @Prop({ required: true })
-  cccd: string
-
-  @Prop({ required: true, enum: [Role.Admin, Role.Employee, Role.HR, Role.Manager] })
-  role: string;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  user: Types.ObjectId;
 
   @Prop({ type: String, default: null })
   teamId: string;
 
-  @Prop({ type: [{ productCode: String, operationId: String }], default: [] })
-  primaryOperations: { productCode: string; operationId: string }[]; // công đoạn chính theo mã hàng
-
   @Prop({
-    type: [{
-      date: String,
-      productCode: String,
-      operationId: String,
-      amount: Number,
-      isPrimary: Boolean
-    }], default: []
+    type: [{ productCode: String, operationId: String }],
+    default: [],
   })
-  productivity: { date: string; productCode: string; operationId: string; amount: number; isPrimary: boolean }[];
+  primaryOperations: { productCode: string; operationId: string }[];
 
-  @Prop({ type: [{ date: String, startTime: String, endTime: String }], default: [] })
-  workingHours: { date: string; startTime: string; endTime: string }[];
+  @Prop({ type: [OperationLogSchema], default: [] })
+  productivity: OperationLog[];
+
+  @Prop({ type: [WorkingHourSchema], default: [] })
+  workingHours: WorkingHour[];
 }
 
-export const WorkerProfileShema = SchemaFactory.createForClass(WorkerProfile);
-WorkerProfileShema.index({ username: 1 });
-WorkerProfileShema.index({ teamId: 1 });
-WorkerProfileShema.index({ 'productivity.date': 1 });
-WorkerProfileShema.index({ 'workingHours.date': 1 });
+export const WorkerProfileSchema = SchemaFactory.createForClass(WorkerProfile);
+
+WorkerProfileSchema.index({ fullName: 1 });
+WorkerProfileSchema.index({ teamId: 1 });
+WorkerProfileSchema.index({ 'productivity.date': 1 });
+WorkerProfileSchema.index({ 'workingHours.date': 1 });
